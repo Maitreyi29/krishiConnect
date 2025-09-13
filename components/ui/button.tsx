@@ -2,22 +2,27 @@ import React from "react"
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children: React.ReactNode
-  variant?: "outline" | "default" // add other variants if needed
-  size?: "sm" | "md" | "lg" // add other sizes if needed
+  variant?: "outline" | "default" | "secondary" | "destructive"
+  size?: "sm" | "md" | "lg"
 }
 
-export function Button({ children, variant = "default", size = "md", ...props }: ButtonProps) {
+export function Button({ children, variant = "default", size = "md", className = "", ...props }: ButtonProps) {
+  const baseClasses =
+    "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none ring-offset-background"
+
   let variantClasses = ""
-  if (variant === "outline") variantClasses = "border-2 border-primary text-primary"
-  // Add more variant styles here
+  if (variant === "default") variantClasses = "bg-primary text-primary-foreground hover:bg-primary/90"
+  else if (variant === "outline") variantClasses = "border border-border bg-transparent text-foreground hover:bg-muted"
+  else if (variant === "secondary") variantClasses = "bg-secondary text-secondary-foreground hover:bg-secondary/90"
+  else if (variant === "destructive") variantClasses = "bg-destructive text-destructive-foreground hover:bg-destructive/90"
 
   let sizeClasses = ""
-  if (size === "sm") sizeClasses = "px-2 py-1 text-sm"
-  else if (size === "md") sizeClasses = "px-4 py-2 text-base"
-  else if (size === "lg") sizeClasses = "px-6 py-3 text-lg"
+  if (size === "sm") sizeClasses = "h-8 px-3 text-sm"
+  else if (size === "md") sizeClasses = "h-10 px-4 text-base"
+  else if (size === "lg") sizeClasses = "h-12 px-6 text-lg"
 
   return (
-    <button className={`${variantClasses} ${sizeClasses} ${props.className || ""}`} {...props}>
+    <button className={`${baseClasses} ${variantClasses} ${sizeClasses} ${className}`} {...props}>
       {children}
     </button>
   )

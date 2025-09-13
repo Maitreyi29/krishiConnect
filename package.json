@@ -9,6 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@radix-ui/react-select": "^2.2.6",
+    "farmer": "^0.0.1",
+    "lucide-react": "^0.544.0",
+    "motion": "^12.23.12",
     "next": "15.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0"

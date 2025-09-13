@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '../lib/hooks/useAuth';
+import { apiClient } from '../lib/api';
 import { Mic, Wheat, Tractor } from "lucide-react"
 
 interface LoginPageProps {
@@ -20,6 +21,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [isCreateAccount, setIsCreateAccount] = useState(false)
+  const [location, setLocation] = useState({ state: "", district: "" })
+  const [farmingDetails, setFarmingDetails] = useState({ landSize: "", cropTypes: "", farmingExperience: "" })
   const { login, voiceLogin } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,16 +37,87 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setError("")
 
     try {
-      const success = await login(name.trim(), mobile.trim())
-      if (success) {
-        onLogin(name.trim())
+      if (isCreateAccount) {
+        const success = await handleRegistration()
+        if (success) {
+          onLogin(name.trim())
+        }
       } else {
-        setError("Login failed. Please try again.")
+        const success = await login(name.trim(), mobile.trim())
+        if (success) {
+          onLogin(name.trim())
+        } else {
+          setError("Login failed. Please try again.")
+        }
       }
     } catch (error) {
-      setError("An error occurred during login")
+      setError("An error occurred")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const validateRegistrationForm = (): string | null => {
+    if (!name.trim()) {
+      return language === 'english' ? 'Name is required' : 'नाम आवश्यक है';
+    }
+    
+    if (!mobile.trim()) {
+      return language === 'english' ? 'Mobile number is required' : 'मोबाइल नंबर आवश्यक है';
+    }
+    
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(mobile.trim())) {
+      return language === 'english' ? 'Please enter a valid Indian mobile number' : 'कृपया एक वैध भारतीय मोबाइल नंबर दर्ज करें';
+    }
+    
+    if (farmingDetails.landSize && isNaN(parseFloat(farmingDetails.landSize))) {
+      return language === 'english' ? 'Land size must be a valid number' : 'भूमि का आकार एक वैध संख्या होना चाहिए';
+    }
+    
+    if (farmingDetails.farmingExperience && isNaN(parseInt(farmingDetails.farmingExperience))) {
+      return language === 'english' ? 'Farming experience must be a valid number' : 'कृषि अनुभव एक वैध संख्या होना चाहिए';
+    }
+    
+    return null;
+  }
+
+  const handleRegistration = async (): Promise<boolean> => {
+    try {
+      // Validate form before submission
+      const validationError = validateRegistrationForm();
+      if (validationError) {
+        setError(validationError);
+        return false;
+      }
+
+      const registrationData = {
+        name: name.trim(),
+        mobile: mobile.trim(),
+        language,
+        location: {
+          state: location.state,
+          district: location.district
+        },
+        farmingDetails: {
+          landSize: farmingDetails.landSize ? parseFloat(farmingDetails.landSize) : undefined,
+          cropTypes: farmingDetails.cropTypes ? farmingDetails.cropTypes.split(',').map(c => c.trim()) : [],
+          farmingExperience: farmingDetails.farmingExperience ? parseInt(farmingDetails.farmingExperience) : undefined
+        }
+      }
+
+      const response = await apiClient.register(registrationData)
+      
+      if (response.success) {
+        setError("")
+        return true
+      } else {
+        setError(response.message || "Registration failed")
+        return false
+      }
+    } catch (error) {
+      setError("Registration failed. Please try again.")
+      return false
     }
   }
 
@@ -146,19 +221,19 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </CardHeader>
         <CardContent className="space-y-6 sm:space-y-8 relative p-4 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative">
               <Input
-                type="tel"
+                type="text"
                 placeholder={`📱 ${placeholders.mobile} / Mobile Number`}
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
-                className="h-14 sm:h-16 lg:h-18 text-base sm:text-lg border-2 border-primary/30 focus:border-primary rounded-xl sm:rounded-2xl pl-4 sm:pl-6 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 relative z-10"
-                maxLength={10}
+                className="h-14 sm:h-16 lg:h-18 text-base sm:text-lg border-2 border-primary/30 focus:border-primary rounded-xl sm:rounded-2xl pl-12 sm:pl-14 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 relative z-10"
+                required
               />
+              <Tractor className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-primary/70 z-20" />
             </div>
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-emerald-400/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+            <div className="relative">
               <Input
                 type="text"
                 placeholder={`👤 ${placeholders.name} / Your Name`}
@@ -169,6 +244,51 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               />
               <Mic className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-primary/70 z-20" />
             </div>
+            {isCreateAccount && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    type="text"
+                    placeholder={language === 'english' ? '🏛️ State' : '🏛️ राज्य'}
+                    value={location.state}
+                    onChange={(e) => setLocation({...location, state: e.target.value})}
+                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                  />
+                  <Input
+                    type="text"
+                    placeholder={language === 'english' ? '🏘️ District' : '🏘️ जिला'}
+                    value={location.district}
+                    onChange={(e) => setLocation({...location, district: e.target.value})}
+                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    type="number"
+                    placeholder={language === 'english' ? '🌾 Land Size (acres)' : '🌾 भूमि का आकार (एकड़)'}
+                    value={farmingDetails.landSize}
+                    onChange={(e) => setFarmingDetails({...farmingDetails, landSize: e.target.value})}
+                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                  />
+                  <Input
+                    type="number"
+                    placeholder={language === 'english' ? '📅 Years of Experience' : '📅 अनुभव के वर्ष'}
+                    value={farmingDetails.farmingExperience}
+                    onChange={(e) => setFarmingDetails({...farmingDetails, farmingExperience: e.target.value})}
+                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                  />
+                </div>
+
+                <Input
+                  type="text"
+                  placeholder={language === 'english' ? '🌱 Crops (comma separated)' : '🌱 फसलें (अल्पविराम से अलग करें)'}
+                  value={farmingDetails.cropTypes}
+                  onChange={(e) => setFarmingDetails({...farmingDetails, cropTypes: e.target.value})}
+                  className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                />
+              </>
+            )}
             {error && (
               <div className="text-red-500 text-sm text-center mb-4 p-2 bg-red-50 rounded-lg">
                 {error}
@@ -180,8 +300,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Logging in..." : placeholders.login}
+              {isLoading ? 
+                (isCreateAccount ? "Creating Account..." : "Logging in...") : 
+                (isCreateAccount ? 
+                  (language === 'english' ? '🌟 Create Account' : '🌟 खाता बनाएं') : 
+                  placeholders.login
+                )
+              }
             </Button>
+
+            {isCreateAccount && (
+              <Button
+                type="button"
+                onClick={() => setIsCreateAccount(false)}
+                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition-all duration-300"
+              >
+                {language === 'english' ? '← Back to Login' : '← लॉगिन पर वापस जाएं'}
+              </Button>
+            )}
           </form>
 
           <div className="relative">
@@ -204,6 +340,25 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               {placeholders.voice}
               <span className="text-lg sm:text-xl lg:text-2xl animate-bounce animation-delay-150">🎙️</span>
             </span>
+          </Button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t-2 border-gradient-to-r from-green-200 via-emerald-300 to-amber-200" />
+            </div>
+            <div className="relative flex justify-center text-sm font-semibold">
+              <span className="bg-white px-4 py-1 text-gray-600 rounded-full border border-gray-200 shadow-sm">
+                {language === 'english' ? 'New User?' : 'नए उपयोगकर्ता?'}
+              </span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => setIsCreateAccount(true)}
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+          >
+            {language === 'english' ? '🌟 Create New Account' : '🌟 नया खाता बनाएं'}
           </Button>
 
           <div className="text-center">

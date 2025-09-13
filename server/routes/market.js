@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const MarketPrice = require('../models/MarketPrice');
+const mockDB = require('../utils/mockDatabase');
 
 const router = express.Router();
 
@@ -11,14 +12,8 @@ router.get('/prices', async (req, res) => {
   try {
     const { crop, state, district, limit = 10 } = req.query;
 
-    let query = {};
-    if (crop) query.cropName = new RegExp(crop, 'i');
-    if (state) query['market.location.state'] = new RegExp(state, 'i');
-    if (district) query['market.location.district'] = new RegExp(district, 'i');
-
-    const prices = await MarketPrice.find(query)
-      .sort({ date: -1 })
-      .limit(parseInt(limit));
+    // Get market prices from mock database
+    const prices = await mockDB.getMarketPrices({ crop, state });
 
     if (prices.length === 0) {
       // Generate sample data if no real data exists

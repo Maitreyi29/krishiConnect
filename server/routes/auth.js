@@ -1,7 +1,9 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { validateLogin, validateRegistration } = require('../middleware/validation');
+const mockDB = require('../utils/mockDatabase');
 
 const router = express.Router();
 
@@ -12,35 +14,28 @@ router.post('/login', validateLogin, async (req, res) => {
   try {
     const { name, mobile } = req.body;
 
-    // Check if user exists
-    let user = await User.findOne({ name: name.trim() });
-
-    if (!user) {
-      // Create new user if doesn't exist
-      user = new User({
-        name: name.trim(),
-        mobile,
-        lastLogin: new Date()
+    // Check if user exists in mock database
+    const existingUser = await mockDB.findUserByMobile(mobile.trim());
+    
+    if (!existingUser) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found. Please register first.'
       });
-      await user.save();
-    } else {
-      // Update last login
-      user.lastLogin = new Date();
-      await user.save();
+    }
+
+    // Verify name matches (simple check for demo)
+    if (existingUser.name.toLowerCase() !== name.trim().toLowerCase()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
     // Generate JWT token
-    const payload = {
-      user: {
-        id: user.id,
-        name: user.name,
-        mobile: user.mobile
-      }
-    };
-
     const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET || 'krishiconnect_secret_key',
+      { userId: existingUser.id, mobile: existingUser.mobile },
+      process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '7d' }
     );
 
@@ -48,13 +43,7 @@ router.post('/login', validateLogin, async (req, res) => {
       success: true,
       message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        language: user.language,
-        location: user.location,
-        farmingDetails: user.farmingDetails
-      }
+      user: existingUser
     });
 
   } catch (error) {
@@ -220,6 +209,74 @@ router.put('/profile', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error'
+    });
+  }
+});
+
+// @route   POST /api/auth/register
+// @desc    Register new user
+// @access  Public
+router.post('/register', async (req, res) => {
+  try {
+    const { name, mobile, language, location, farmingDetails } = req.body;
+
+    // Basic validation
+    if (!name || !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name and mobile number are required'
+      });
+    }
+
+    // Mobile number validation (Indian format)
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(mobile)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid Indian mobile number'
+      });
+    }
+
+    // Check if user already exists in mock database
+    const existingUser = await mockDB.findUserByMobile(mobile.trim());
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this mobile number already exists'
+      });
+    }
+
+    // Create user data for mock database
+    const userData = {
+      name: name.trim(),
+      mobile: mobile.trim(),
+      language: language || 'english',
+      location: location || {},
+      farmingDetails: farmingDetails || {}
+    };
+
+    // Save user to mock database
+    const newUser = await mockDB.createUser(userData);
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: newUser.id, mobile: newUser.mobile },
+      process.env.JWT_SECRET || 'fallback_secret',
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      token,
+      user: newUser
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration'
     });
   }
 });

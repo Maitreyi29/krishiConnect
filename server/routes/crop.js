@@ -1,5 +1,6 @@
 const express = require('express');
 const CropAdvice = require('../models/CropAdvice');
+const mockDB = require('../utils/mockDatabase');
 
 const router = express.Router();
 
@@ -101,7 +102,7 @@ router.get('/list', async (req, res) => {
     if (season) query.season = season;
     if (state) query['region.state'] = new RegExp(state, 'i');
 
-    const crops = await CropAdvice.distinct('cropName', query);
+    const crops = await mockDB.getCropAdvice({ crop: 'cropName', query });
     
     res.json({
       success: true,

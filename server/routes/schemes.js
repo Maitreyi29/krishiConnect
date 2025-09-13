@@ -1,5 +1,6 @@
 const express = require('express');
 const GovernmentScheme = require('../models/GovernmentScheme');
+const mockDB = require('../utils/mockDatabase');
 
 const router = express.Router();
 
@@ -10,25 +11,8 @@ router.get('/list', async (req, res) => {
   try {
     const { state, farmerType, page = 1, limit = 10 } = req.query;
 
-    let query = { isActive: true };
-    if (state) {
-      query.$or = [
-        { 'location.applicableStates': new RegExp(state, 'i') },
-        { 'location.applicableStates': 'all' }
-      ];
-    }
-    if (farmerType) {
-      query.$or = [
-        { 'eligibility.farmerType': farmerType },
-        { 'eligibility.farmerType': 'all' }
-      ];
-    }
-
-    const schemes = await GovernmentScheme.find(query)
-      .select('name description benefits timeline contactInfo')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    // Get government schemes from mock database
+    const schemes = await mockDB.getGovernmentSchemes({ state });
 
     const total = await GovernmentScheme.countDocuments(query);
 

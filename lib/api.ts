@@ -65,6 +65,23 @@ class ApiClient {
     return response;
   }
 
+  async register(registrationData: any) {
+    const response = await this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(registrationData),
+    });
+
+    if (response.success && response.token) {
+      this.token = response.token;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('krishiconnect_token', response.token);
+        localStorage.setItem('krishiconnect_user', JSON.stringify(response.user));
+      }
+    }
+
+    return response;
+  }
+
   async voiceLogin(audioData: any, name: string) {
     const response = await this.request('/auth/voice-login', {
       method: 'POST',

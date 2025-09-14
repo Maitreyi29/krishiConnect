@@ -1,6 +1,6 @@
-# KrishiConnect - Smart Farming Assistant
+# annData - Smart Farming Assistant
 
-KrishiConnect is an AI-powered farming assistant designed specifically for Indian farmers. It provides multilingual support, weather forecasts, crop advice, market prices, government schemes information, and an intelligent chat assistant (annData) to help farmers make informed decisions.
+annData is an AI-powered farming assistant designed specifically for Indian farmers. It provides multilingual support, weather forecasts, crop advice, market prices, government schemes information, and an intelligent chat assistant (annData) to help farmers make informed decisions.
 
 ## 🌟 Features
 

@@ -38,10 +38,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const { login, register } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
-    
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
     try {
       if (isCreateAccount) {
         const success = await handleRegistration()
@@ -49,15 +49,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           onLogin(name)
         }
       } else {
-        const success = await handleLogin()
+        if (!email.trim() || !password.trim()) {
+          setError("Email and password are required");
+          setIsLoading(false);
+          return;
+        }
+        const success = await login(email, password);
         if (success) {
-          onLogin(name || "User")
+          onLogin(name || "User");
+        } else {
+          setError("Invalid email or password");
         }
       }
     } catch (error) {
-      setError("An error occurred")
+      setError("An error occurred during login.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -141,34 +148,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     } catch (error) {
       setError("Registration failed. Please try again.")
       return false
-    }
-  }
-
-  const handleLogin = async (): Promise<boolean> => {
-    try {
-      setIsLoading(true)
-      setError("")
-      
-      if (!email.trim() || !password.trim()) {
-        setError("Email and password are required")
-        return false
-      }
-
-      const success = await login(email, password)
-      
-      if (success) {
-        onLogin(name || "User")
-        return true
-      } else {
-        setError("Invalid email or password")
-        return false
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      setError("Login failed. Please try again.")
-      return false
-    } finally {
-      setIsLoading(false)
     }
   }
 

@@ -17,7 +17,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (name: string, mobile: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   register: (userData: any) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (updates: any) => Promise<boolean>;
@@ -34,13 +34,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session on mount
     checkUser();
   }, []);
 
   const checkUser = async () => {
     try {
-      // Check localStorage for existing user data
       if (typeof window !== 'undefined') {
         const savedUser = localStorage.getItem('krishiconnect_user');
         const token = localStorage.getItem('krishiconnect_token');
@@ -56,13 +54,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (name: string, mobile: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const result = await apiClient.login(name, mobile);
+      const result = await apiClient.login(email, password);
       
       if (result.success && result.user) {
         setUser(result.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('krishiconnect_user', JSON.stringify(result.user));
+          localStorage.setItem('krishiconnect_token', result.token);
+        }
         return true;
       }
       return false;
@@ -81,6 +83,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (result.success && result.user) {
         setUser(result.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('krishiconnect_user', JSON.stringify(result.user));
+          localStorage.setItem('krishiconnect_token', result.token);
+        }
         return true;
       }
       return false;
@@ -96,6 +102,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       apiClient.logout();
       setUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('krishiconnect_user');
+        localStorage.removeItem('krishiconnect_token');
+      }
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -106,6 +116,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const result = await apiClient.updateProfile(updates);
       if (result.success && result.user) {
         setUser(result.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('krishiconnect_user', JSON.stringify(result.user));
+        }
         return true;
       }
       return false;

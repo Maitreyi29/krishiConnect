@@ -11,6 +11,7 @@ const cropRoutes = require('./routes/crop');
 const marketRoutes = require('./routes/market');
 const schemeRoutes = require('./routes/schemes');
 const chatRoutes = require('./routes/chat');
+const voiceRoutes = require('./routes/voice');
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/crop', cropRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/schemes', schemeRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/voice', voiceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

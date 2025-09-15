@@ -1,172 +1,165 @@
 const express = require('express');
-const axios = require('axios');
-const WeatherData = require('../models/WeatherData');
-
 const router = express.Router();
+const weatherService = require('../config/weather');
+const { validateWeatherRequest } = require('../middleware/validation');
 
-// @route   GET /api/weather/current
-// @desc    Get current weather for location
-// @access  Public
-router.get('/current', async (req, res) => {
+// Get current weather for a city
+router.get('/current', validateWeatherRequest, async (req, res) => {
   try {
-    const { lat, lon, state, district } = req.query;
-
-    if (!lat || !lon) {
+    const { city, state } = req.query;
+    
+    if (!city) {
       return res.status(400).json({
         success: false,
-        message: 'Latitude and longitude are required'
+        message: 'City parameter is required'
       });
     }
 
-    // Check if we have recent data in database
-    const existingData = await WeatherData.findOne({
-      'location.coordinates.latitude': { $gte: lat - 0.1, $lte: lat + 0.1 },
-      'location.coordinates.longitude': { $gte: lon - 0.1, $lte: lon + 0.1 },
-      lastUpdated: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // 30 minutes
-    });
-
-    if (existingData) {
-      return res.json({
-        success: true,
-        data: existingData
-      });
+    const result = await weatherService.getCurrentWeather(city, state);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
     }
-
-    // Fetch from external weather API (OpenWeatherMap example)
-    const weatherResponse = await axios.get(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`
-    );
-
-    const forecastResponse = await axios.get(
-      `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`
-    );
-
-    const weatherData = new WeatherData({
-      location: {
-        state,
-        district,
-        coordinates: { latitude: lat, longitude: lon }
-      },
-      current: {
-        temperature: weatherResponse.data.main.temp,
-        humidity: weatherResponse.data.main.humidity,
-        windSpeed: weatherResponse.data.wind.speed,
-        description: weatherResponse.data.weather[0].description,
-        icon: weatherResponse.data.weather[0].icon
-      },
-      forecast: forecastResponse.data.list.slice(0, 5).map(item => ({
-        date: new Date(item.dt * 1000),
-        maxTemp: item.main.temp_max,
-        minTemp: item.main.temp_min,
-        humidity: item.main.humidity,
-        rainfall: item.rain?.['3h'] || 0,
-        description: item.weather[0].description,
-        icon: item.weather[0].icon
-      })),
-      alerts: generateWeatherAlerts(weatherResponse.data, forecastResponse.data)
-    });
-
-    await weatherData.save();
-
-    res.json({
-      success: true,
-      data: weatherData
-    });
-
   } catch (error) {
-    console.error('Weather API error:', error);
+    console.error('Weather current error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch weather data'
+      message: 'Internal server error',
+      error: error.message
     });
   }
 });
 
-// @route   GET /api/weather/forecast
-// @desc    Get weather forecast
-// @access  Public
-router.get('/forecast', async (req, res) => {
+// Get weather forecast for a city
+router.get('/forecast', validateWeatherRequest, async (req, res) => {
   try {
-    const { lat, lon, days = 5 } = req.query;
-
-    if (!lat || !lon) {
+    const { city, state } = req.query;
+    
+    if (!city) {
       return res.status(400).json({
         success: false,
-        message: 'Latitude and longitude are required'
+        message: 'City parameter is required'
       });
     }
 
-    const forecastResponse = await axios.get(
-      `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`
-    );
-
-    const forecast = forecastResponse.data.list.slice(0, days * 8).map(item => ({
-      date: new Date(item.dt * 1000),
-      temperature: item.main.temp,
-      maxTemp: item.main.temp_max,
-      minTemp: item.main.temp_min,
-      humidity: item.main.humidity,
-      rainfall: item.rain?.['3h'] || 0,
-      windSpeed: item.wind.speed,
-      description: item.weather[0].description,
-      icon: item.weather[0].icon
-    }));
-
-    res.json({
-      success: true,
-      data: {
-        location: { latitude: lat, longitude: lon },
-        forecast
-      }
-    });
-
+    const result = await weatherService.getWeatherForecast(city, state);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
   } catch (error) {
-    console.error('Forecast API error:', error);
+    console.error('Weather forecast error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch forecast data'
+      message: 'Internal server error',
+      error: error.message
     });
   }
 });
 
-// Helper function to generate weather alerts
-function generateWeatherAlerts(current, forecast) {
-  const alerts = [];
+// Get weather alerts and farming advice
+router.get('/alerts', validateWeatherRequest, async (req, res) => {
+  try {
+    const { city, state } = req.query;
+    
+    if (!city) {
+      return res.status(400).json({
+        success: false,
+        message: 'City parameter is required'
+      });
+    }
 
-  // High temperature alert
-  if (current.main.temp > 40) {
-    alerts.push({
-      type: 'heat',
-      severity: 'high',
-      message: 'Extreme heat warning. Protect crops and ensure adequate irrigation.',
-      validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    const result = await weatherService.getWeatherAlerts(city, state);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('Weather alerts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
     });
   }
+});
 
-  // Heavy rain alert
-  const rainForecast = forecast.list.slice(0, 8);
-  const totalRain = rainForecast.reduce((sum, item) => sum + (item.rain?.['3h'] || 0), 0);
-  
-  if (totalRain > 50) {
-    alerts.push({
-      type: 'rain',
-      severity: 'medium',
-      message: 'Heavy rainfall expected. Ensure proper drainage in fields.',
-      validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000)
+// Get weather by coordinates (for mobile GPS)
+router.get('/coordinates', async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+    
+    if (!lat || !lon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude parameters are required'
+      });
+    }
+
+    // For coordinates, we'll need to reverse geocode to get city name
+    // This is a simplified implementation - in production, use a proper reverse geocoding service
+    const city = 'Current Location';
+    const result = await weatherService.getCurrentWeather(city);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('Weather coordinates error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
     });
   }
+});
 
-  // Wind alert
-  if (current.wind.speed > 15) {
-    alerts.push({
-      type: 'storm',
-      severity: 'medium',
-      message: 'Strong winds expected. Secure loose structures and protect young plants.',
-      validUntil: new Date(Date.now() + 12 * 60 * 60 * 1000)
+// Get weather cache statistics (for debugging)
+router.get('/cache-stats', (req, res) => {
+  try {
+    const stats = weatherService.getCacheStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get cache stats',
+      error: error.message
     });
   }
+});
 
-  return alerts;
-}
+// Clear weather cache
+router.post('/clear-cache', (req, res) => {
+  try {
+    const result = weatherService.clearCache();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear cache',
+      error: error.message
+    });
+  }
+});
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Weather service is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 module.exports = router;

@@ -48,16 +48,16 @@ class ApiClient {
   }
 
   // Auth methods
-  async login(name: string, mobile: string) {
+  async login(email: string, password: string) {
     const response = await this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ name, mobile }),
+      body: JSON.stringify({ email, password }),
     });
 
-    if (response.success && response.token) {
-      this.token = response.token;
+    if (response.success && response.session) {
+      this.token = response.session.access_token;
       if (typeof window !== 'undefined') {
-        localStorage.setItem('krishiconnect_token', response.token);
+        localStorage.setItem('krishiconnect_token', response.session.access_token);
         localStorage.setItem('krishiconnect_user', JSON.stringify(response.user));
       }
     }
@@ -118,26 +118,45 @@ class ApiClient {
     }
   }
 
-  // Weather methods
-  async getCurrentWeather(lat: number, lon: number, state?: string, district?: string) {
-    const params = new URLSearchParams({
-      lat: lat.toString(),
-      lon: lon.toString(),
-    });
+  // Weather endpoints
+  async getCurrentWeather(city: string, state?: string) {
+    const params = new URLSearchParams({ city });
     if (state) params.append('state', state);
-    if (district) params.append('district', district);
-
-    return this.request(`/weather/current?${params}`);
+    
+    return this.request(`/weather/current?${params.toString()}`);
   }
 
-  async getWeatherForecast(lat: number, lon: number, days: number = 5) {
+  async getWeatherForecast(city: string, state?: string) {
+    const params = new URLSearchParams({ city });
+    if (state) params.append('state', state);
+    
+    return this.request(`/weather/forecast?${params.toString()}`);
+  }
+
+  async getWeatherAlerts(city: string, state?: string) {
+    const params = new URLSearchParams({ city });
+    if (state) params.append('state', state);
+    
+    return this.request(`/weather/alerts?${params.toString()}`);
+  }
+
+  async getWeatherByCoordinates(lat: number, lon: number) {
     const params = new URLSearchParams({
       lat: lat.toString(),
-      lon: lon.toString(),
-      days: days.toString(),
+      lon: lon.toString()
     });
+    
+    return this.request(`/weather/coordinates?${params.toString()}`);
+  }
 
-    return this.request(`/weather/forecast?${params}`);
+  async getWeatherCacheStats() {
+    return this.request('/weather/cache-stats');
+  }
+
+  async clearWeatherCache() {
+    return this.request('/weather/clear-cache', {
+      method: 'POST'
+    });
   }
 
   // Crop methods
@@ -148,6 +167,13 @@ class ApiClient {
     if (language) params.append('language', language);
 
     return this.request(`/crop/advice?${params}`);
+  }
+
+  async getAICropAdvice(query: string, userContext?: any) {
+    return this.request('/crop/advice', {
+      method: 'POST',
+      body: JSON.stringify({ query, userContext }),
+    });
   }
 
   async getCropList(season?: string, state?: string) {
@@ -171,6 +197,30 @@ class ApiClient {
     if (month) params.append('month', month.toString());
 
     return this.request(`/crop/seasonal?${params}`);
+  }
+
+  async getAISeasonalAdvice(season?: string, location?: any, crops?: string[], userContext?: any) {
+    return this.request('/crop/seasonal', {
+      method: 'POST',
+      body: JSON.stringify({ season, location, crops, userContext }),
+    });
+  }
+
+  async getFertilizerAdvice(crop: string, soilType?: string, growthStage?: string, location?: any, userContext?: any) {
+    return this.request('/crop/fertilizer', {
+      method: 'POST',
+      body: JSON.stringify({ crop, soilType, growthStage, location, userContext }),
+    });
+  }
+
+  async getCropCacheStats() {
+    return this.request('/crop/cache-stats');
+  }
+
+  async clearCropCache() {
+    return this.request('/crop/clear-cache', {
+      method: 'POST',
+    });
   }
 
   // Market methods
@@ -237,10 +287,10 @@ class ApiClient {
   }
 
   // Chat methods
-  async askAnnData(message: string, language?: string, userId?: string) {
+  async askAnnData(message: string, language?: string, userId?: string, userContext?: any) {
     return this.request('/chat/ask', {
       method: 'POST',
-      body: JSON.stringify({ message, language, userId }),
+      body: JSON.stringify({ message, language, userId, userContext }),
     });
   }
 
@@ -251,11 +301,59 @@ class ApiClient {
     return this.request(`/chat/history?${params}`);
   }
 
-  async submitFeedback(messageId: string, helpful: boolean, rating?: number) {
+  async submitFeedback(messageId: string, helpful: boolean, rating?: number, comments?: string) {
     return this.request('/chat/feedback', {
+      method: 'POST',
+      body: JSON.stringify({ messageId, helpful, rating, comments }),
+    });
+  }
+
+  async getChatStats(userId?: string) {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+
+    return this.request(`/chat/stats?${params}`);
+  }
+
+  async clearChatCache() {
+    return this.request('/chat/clear-cache', {
+      method: 'POST',
+    });
+  }
+
+  // New AI-powered chat methods
+  async askGemini(message: string, language?: string, userId?: string) {
+    return this.request('/chat/gemini', {
+      method: 'POST',
+      body: JSON.stringify({ message, language, userId }),
+    });
+  }
+
+  async getGeminiChatHistory(userId: string, limit?: number) {
+    const params = new URLSearchParams({ userId });
+    if (limit) params.append('limit', limit.toString());
+
+    return this.request(`/chat/gemini/history?${params}`);
+  }
+
+  async submitGeminiFeedback(messageId: string, helpful: boolean, rating?: number) {
+    return this.request('/chat/gemini/feedback', {
       method: 'POST',
       body: JSON.stringify({ messageId, helpful, rating }),
     });
+  }
+
+  // Voice API
+  async textToSpeech(text: string, language: string): Promise<Blob> {
+    const response = await this.request('/voice/text-to-speech', {
+      method: 'POST',
+      body: JSON.stringify({ text, language }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return response.data;
   }
 
   // Health check

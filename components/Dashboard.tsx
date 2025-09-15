@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { apiClient } from "@/lib/api"
 import {
   Bug,
   Cloud,
@@ -21,11 +23,19 @@ import {
   Users,
   ChevronDown,
   Tractor,
+  Bot,
+  X,
 } from "lucide-react"
 
 interface DashboardProps {
   farmerName: string
   onLogout: () => void
+}
+
+interface ChatContext {
+  type?: 'weather' | 'crop' | 'pest' | 'market' | 'schemes' | 'soil' | 'general'
+  data?: any
+  location?: string
 }
 
 const featuresData = [
@@ -217,9 +227,11 @@ const farmerQuotes = [
 ]
 
 export default function Dashboard({ farmerName, onLogout }: DashboardProps) {
+  const router = useRouter()
   const [language, setLanguage] = useState("english")
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0)
   const [askQuery, setAskQuery] = useState("")
+  const [userLocation, setUserLocation] = useState<string>('')
 
   // Get features with dynamic labels based on language
   const getFeatures = () => {
@@ -267,7 +279,7 @@ export default function Dashboard({ farmerName, onLogout }: DashboardProps) {
       case "bhojpuri":
         return `प्रणाम ${farmerName} 👋 | किसान के साथी – annData`
       case "odia":
-        return `ନମସ୍କାର ${farmerName} 👋 | କୃଷକଙ୍କ ସାଥୀ – annData`
+        return `ନମସ୍କାର ${farmerName} 👋 | କୃଷକ ସାଥୀ – annData`
       default:
         return `Hello ${farmerName} 👋 | Farmer's Companion – annData`
     }
@@ -509,17 +521,70 @@ export default function Dashboard({ farmerName, onLogout }: DashboardProps) {
     }
   }
 
-  const handleFeatureClick = (feature: string) => {
+  const handleFeatureClick = async (feature: string, featureType: string) => {
+    // Handle weather card specifically
+    if (featureType === 'weather') {
+      await handleWeatherCardClick()
+      return
+    }
+    
+    // Handle other AI-powered features
+    if (['crop', 'pest', 'market', 'schemes', 'soil'].includes(featureType)) {
+      const params = new URLSearchParams({
+        type: featureType,
+        location: userLocation || 'India'
+      })
+      router.push(`/chat?${params.toString()}`)
+      return
+    }
+    
+    // For other features, show coming soon message
     const messages = getAlertMessages()
     alert(`${feature} ${messages.featureComingSoon}`)
   }
 
+  const handleWeatherCardClick = async () => {
+    try {
+      // Get user's location (you can enhance this with geolocation API)
+      const location = userLocation || 'Delhi' // Default location
+      
+      // Fetch current weather data
+      const weatherResponse = await apiClient.getCurrentWeather(location)
+      
+      const params = new URLSearchParams({
+        type: 'weather',
+        location: location
+      })
+      
+      if (weatherResponse.success) {
+        params.append('weatherData', encodeURIComponent(JSON.stringify(weatherResponse.data)))
+      }
+      
+      router.push(`/chat?${params.toString()}`)
+    } catch (error) {
+      console.error('Weather fetch error:', error)
+      // Still navigate to chat but without weather data
+      const params = new URLSearchParams({
+        type: 'weather',
+        location: userLocation || 'Delhi'
+      })
+      router.push(`/chat?${params.toString()}`)
+    }
+  }
+
   const handleAskAnnData = () => {
     if (askQuery.trim()) {
-      const messages = getAlertMessages()
-      alert(`${messages.youAsked} "${askQuery}". ${messages.aiResponse}`)
+      const params = new URLSearchParams({
+        type: 'general',
+        query: askQuery.trim()
+      })
+      router.push(`/chat?${params.toString()}`)
       setAskQuery("")
     }
+  }
+
+  const handleChatOpen = () => {
+    router.push('/chat')
   }
 
   return (
@@ -634,11 +699,15 @@ export default function Dashboard({ farmerName, onLogout }: DashboardProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto px-2">
           {getFeatures().map((feature, index) => {
             const IconComponent = feature.icon
+            // Map feature types based on index
+            const featureTypes = ['weather', 'crop', 'pest', 'market', 'schemes', 'community', 'soil', 'general', 'help']
+            const featureType = featureTypes[index] || 'general'
+            
             return (
               <Card
                 key={index}
                 className={`cursor-pointer transition-all duration-500 transform hover:scale-105 sm:hover:scale-110 hover:shadow-2xl border-0 bg-gradient-to-br ${feature.gradient} ${feature.hoverGradient} text-white overflow-hidden h-40 sm:h-44 lg:h-48 rounded-2xl sm:rounded-3xl relative group`}
-                onClick={() => handleFeatureClick(feature.label)}
+                onClick={() => handleFeatureClick(feature.label, featureType)}
               >
                 {/* Card Glow Effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -670,6 +739,14 @@ export default function Dashboard({ farmerName, onLogout }: DashboardProps) {
           </div>
         </div>
       </main>
+
+      {/* Floating Chat Button */}
+      <Button
+        className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-xl rounded-full p-4 transition-all duration-300 hover:scale-110 animate-bounce"
+        onClick={handleChatOpen}
+      >
+        <Bot className="h-6 w-6" />
+      </Button>
     </div>
   )
 }

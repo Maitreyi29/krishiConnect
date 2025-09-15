@@ -6,48 +6,52 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '../lib/hooks/useAuth';
-import { apiClient } from '../lib/api';
 import { Mic, Wheat, Tractor } from "lucide-react"
+import voiceService from '../lib/voiceService';
 
 interface LoginPageProps {
   onLogin: (name: string) => void
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [mobile, setMobile] = useState("")
   const [language, setLanguage] = useState("english")
-  const [isVoiceMode, setIsVoiceMode] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [isCreateAccount, setIsCreateAccount] = useState(false)
-  const [location, setLocation] = useState({ state: "", district: "" })
-  const [farmingDetails, setFarmingDetails] = useState({ landSize: "", cropTypes: "", farmingExperience: "" })
-  const { login, voiceLogin } = useAuth()
+  const [isListening, setIsListening] = useState(false);
+  
+  // Registration form states
+  const [location, setLocation] = useState({
+    state: "",
+    district: ""
+  })
+  const [farmingDetails, setFarmingDetails] = useState({
+    landSize: "",
+    cropTypes: "",
+    farmingExperience: ""
+  })
+
+  const { login, register } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !mobile.trim()) {
-      setError("Please enter both name and mobile number")
-      return
-    }
-
     setIsLoading(true)
     setError("")
-
+    
     try {
       if (isCreateAccount) {
         const success = await handleRegistration()
         if (success) {
-          onLogin(name.trim())
+          onLogin(name)
         }
       } else {
-        const success = await login(name.trim(), mobile.trim())
+        const success = await handleLogin()
         if (success) {
-          onLogin(name.trim())
-        } else {
-          setError("Login failed. Please try again.")
+          onLogin(name || "User")
         }
       }
     } catch (error) {
@@ -60,6 +64,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const validateRegistrationForm = (): string | null => {
     if (!name.trim()) {
       return language === 'english' ? 'Name is required' : 'नाम आवश्यक है';
+    }
+    
+    if (!email.trim()) {
+      return language === 'english' ? 'Email is required' : 'ईमेल आवश्यक है';
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return language === 'english' ? 'Please enter a valid email address' : 'कृपया एक वैध ईमेल पता दर्ज करें';
+    }
+
+    if (!password.trim()) {
+      return language === 'english' ? 'Password is required' : 'पासवर्ड आवश्यक है';
+    }
+
+    if (password.length < 6) {
+      return language === 'english' ? 'Password must be at least 6 characters' : 'पासवर्ड कम से कम 6 अक्षर का होना चाहिए';
     }
     
     if (!mobile.trim()) {
@@ -91,9 +112,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         return false;
       }
 
-      const registrationData = {
+      const userData = {
         name: name.trim(),
         mobile: mobile.trim(),
+        email: email.trim(),
+        password: password,
         language,
         location: {
           state: location.state,
@@ -106,13 +129,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         }
       }
 
-      const response = await apiClient.register(registrationData)
+      const success = await register(userData)
       
-      if (response.success) {
+      if (success) {
         setError("")
         return true
       } else {
-        setError(response.message || "Registration failed")
+        setError("Registration failed. Please try again.")
         return false
       }
     } catch (error) {
@@ -121,10 +144,54 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
   }
 
-  const handleVoiceLogin = () => {
-    // Placeholder for voice functionality
-    alert("Voice login feature coming soon! / आवाज़ लॉगिन जल्द आ रहा है!")
+  const handleLogin = async (): Promise<boolean> => {
+    try {
+      setIsLoading(true)
+      setError("")
+      
+      if (!email.trim() || !password.trim()) {
+        setError("Email and password are required")
+        return false
+      }
+
+      const success = await login(email, password)
+      
+      if (success) {
+        onLogin(name || "User")
+        return true
+      } else {
+        setError("Invalid email or password")
+        return false
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setError("Login failed. Please try again.")
+      return false
+    } finally {
+      setIsLoading(false)
+    }
   }
+
+  const handleVoiceLogin = async () => {
+    if (!voiceService.isSpeechRecognitionSupported()) {
+      alert('Speech recognition is not supported in your browser');
+      return;
+    }
+
+    try {
+      setIsListening(true);
+      setError('');
+      const transcript = await voiceService.speechToText(language);
+      // Remove spaces and non-numeric characters from the transcript
+      const sanitizedTranscript = transcript.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+      setMobile(sanitizedTranscript);
+    } catch (error) {
+      console.error('Voice input error:', error);
+      setError('Voice input failed. Please try again.');
+    } finally {
+      setIsListening(false);
+    }
+  };
 
   const getPlaceholderText = () => {
     switch (language) {
@@ -220,75 +287,103 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-6 sm:space-y-8 relative p-4 sm:p-6">
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder={`📱 ${placeholders.mobile} / Mobile Number`}
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className="h-14 sm:h-16 lg:h-18 text-base sm:text-lg border-2 border-primary/30 focus:border-primary rounded-xl sm:rounded-2xl pl-12 sm:pl-14 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 relative z-10"
-                required
-              />
-              <Tractor className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-primary/70 z-20" />
-            </div>
-
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder={`👤 ${placeholders.name} / Your Name`}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-14 sm:h-16 lg:h-18 text-base sm:text-lg border-2 border-primary/30 focus:border-primary rounded-xl sm:rounded-2xl pl-12 sm:pl-14 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 relative z-10"
-                required
-              />
-              <Mic className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-primary/70 z-20" />
-            </div>
-            {isCreateAccount && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-4">
+              {isCreateAccount && (
+                <div className="space-y-4">
                   <Input
                     type="text"
-                    placeholder={language === 'english' ? '🏛️ State' : '🏛️ राज्य'}
-                    value={location.state}
-                    onChange={(e) => setLocation({...location, state: e.target.value})}
-                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                    placeholder={language === 'english' ? 'Full Name' : 'पूरा नाम'}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
                   />
+                  <div className="relative">
+                    <Input
+                      type="tel"
+                      placeholder={isListening ? (language === 'english' ? 'Listening...' : 'सुन रहा है...') : (language === 'english' ? 'Mobile Number' : 'मोबाइल नंबर')}
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      required
+                      className={`w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm ${isListening ? 'border-red-500 bg-red-50' : ''}`}
+                    />
+                    <Button 
+                      type="button"
+                      onClick={handleVoiceLogin}
+                      disabled={isListening}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full p-0 ${isListening ? 'bg-red-500' : 'bg-blue-500 hover:bg-blue-600'}`}>
+                      <Mic className="h-4 w-4 text-white" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <Input
+                type="email"
+                placeholder={language === 'english' ? 'Email Address' : 'ईमेल पता'}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
+              />
+
+              <Input
+                type="password"
+                placeholder={language === 'english' ? 'Password' : 'पासवर्ड'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
+              />
+
+              {isCreateAccount && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      type="text"
+                      placeholder={language === 'english' ? 'State' : 'राज्य'}
+                      value={location.state}
+                      onChange={(e) => setLocation({...location, state: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                    />
+                    <Input
+                      type="text"
+                      placeholder={language === 'english' ? 'District' : 'जिला'}
+                      value={location.district}
+                      onChange={(e) => setLocation({...location, district: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      type="number"
+                      placeholder={language === 'english' ? 'Land Size (acres)' : 'भूमि का आकार (एकड़)'}
+                      value={farmingDetails.landSize}
+                      onChange={(e) => setFarmingDetails({...farmingDetails, landSize: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                    />
+                    <Input
+                      type="number"
+                      placeholder={language === 'english' ? 'Experience (years)' : 'अनुभव (वर्ष)'}
+                      value={farmingDetails.farmingExperience}
+                      onChange={(e) => setFarmingDetails({...farmingDetails, farmingExperience: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                    />
+                  </div>
+
                   <Input
                     type="text"
-                    placeholder={language === 'english' ? '🏘️ District' : '🏘️ जिला'}
-                    value={location.district}
-                    onChange={(e) => setLocation({...location, district: e.target.value})}
-                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+                    placeholder={language === 'english' ? 'Crop Types (comma separated)' : 'फसल के प्रकार (अल्पविराम से अलग)'}
+                    value={farmingDetails.cropTypes}
+                    onChange={(e) => setFarmingDetails({...farmingDetails, cropTypes: e.target.value})}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 bg-white/80 backdrop-blur-sm"
                   />
                 </div>
+              )}
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    type="number"
-                    placeholder={language === 'english' ? '🌾 Land Size (acres)' : '🌾 भूमि का आकार (एकड़)'}
-                    value={farmingDetails.landSize}
-                    onChange={(e) => setFarmingDetails({...farmingDetails, landSize: e.target.value})}
-                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
-                  />
-                  <Input
-                    type="number"
-                    placeholder={language === 'english' ? '📅 Years of Experience' : '📅 अनुभव के वर्ष'}
-                    value={farmingDetails.farmingExperience}
-                    onChange={(e) => setFarmingDetails({...farmingDetails, farmingExperience: e.target.value})}
-                    className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
-                  />
-                </div>
-
-                <Input
-                  type="text"
-                  placeholder={language === 'english' ? '🌱 Crops (comma separated)' : '🌱 फसलें (अल्पविराम से अलग करें)'}
-                  value={farmingDetails.cropTypes}
-                  onChange={(e) => setFarmingDetails({...farmingDetails, cropTypes: e.target.value})}
-                  className="h-12 text-base border-2 border-primary/30 focus:border-primary rounded-xl bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
-                />
-              </>
-            )}
             {error && (
               <div className="text-red-500 text-sm text-center mb-4 p-2 bg-red-50 rounded-lg">
                 {error}
@@ -319,28 +414,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </Button>
             )}
           </form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t-2 border-gradient-to-r from-green-200 via-emerald-300 to-amber-200" />
-            </div>
-            <div className="relative flex justify-center text-sm font-semibold">
-              <span className="bg-white px-4 py-1 text-gray-600 rounded-full border border-gray-200 shadow-sm">✨ {language === 'english' ? 'OR' : 'या'} ✨</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            onClick={handleVoiceLogin}
-            className="w-full h-14 sm:h-16 lg:h-18 text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 rounded-xl sm:rounded-2xl border-0 relative overflow-hidden group animate-pulse-slow"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <span className="relative z-10 flex items-center justify-center gap-1 sm:gap-2">
-              <span className="text-lg sm:text-xl lg:text-2xl animate-bounce">🎙️</span>
-              {placeholders.voice}
-              <span className="text-lg sm:text-xl lg:text-2xl animate-bounce animation-delay-150">🎙️</span>
-            </span>
-          </Button>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

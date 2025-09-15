@@ -1,26 +1,16 @@
 "use client"
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from '../api';
 
 interface User {
   id: string;
-  name: string;
-  mobile: string;
-  language: string;
-  location?: {
-    state?: string;
-    district?: string;
-    coordinates?: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  farmingDetails?: {
-    landSize?: number;
-    cropTypes?: string[];
-    farmingExperience?: number;
-  };
+  email?: string;
+  name?: string;
+  mobile?: string;
+  language?: string;
+  location?: any;
+  farmingDetails?: any;
 }
 
 interface AuthContextType {
@@ -28,48 +18,51 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (name: string, mobile: string) => Promise<boolean>;
-  voiceLogin: (audioData: any, name: string) => Promise<boolean>;
-  logout: () => void;
-  updateProfile: (profileData: Partial<User>) => Promise<boolean>;
+  register: (userData: any) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateProfile: (updates: any) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing user session on mount
-    const checkAuthStatus = async () => {
-      try {
-        const token = localStorage.getItem('krishiconnect_token');
-        const savedUser = localStorage.getItem('krishiconnect_user');
-        
-        if (token && savedUser) {
-          const userData = JSON.parse(savedUser);
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-        // Clear invalid data
-        localStorage.removeItem('krishiconnect_token');
-        localStorage.removeItem('krishiconnect_user');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuthStatus();
+    // Check for existing session on mount
+    checkUser();
   }, []);
+
+  const checkUser = async () => {
+    try {
+      // Check localStorage for existing user data
+      if (typeof window !== 'undefined') {
+        const savedUser = localStorage.getItem('krishiconnect_user');
+        const token = localStorage.getItem('krishiconnect_token');
+        
+        if (savedUser && token) {
+          setUser(JSON.parse(savedUser));
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (name: string, mobile: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await apiClient.login(name, mobile);
+      const result = await apiClient.login(name, mobile);
       
-      if (response.success && response.user) {
-        setUser(response.user);
+      if (result.success && result.user) {
+        setUser(result.user);
         return true;
       }
       return false;
@@ -81,36 +74,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const voiceLogin = async (audioData: any, name: string): Promise<boolean> => {
+  const register = async (userData: any): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await apiClient.voiceLogin(audioData, name);
+      const result = await apiClient.register(userData);
       
-      if (response.success && response.user) {
-        setUser(response.user);
+      if (result.success && result.user) {
+        setUser(result.user);
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Voice login error:', error);
+      console.error('Registration error:', error);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    apiClient.logout();
-    setUser(null);
+  const logout = async (): Promise<void> => {
+    try {
+      apiClient.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
-  const updateProfile = async (profileData: Partial<User>): Promise<boolean> => {
+  const updateProfile = async (updates: any): Promise<boolean> => {
     try {
-      const response = await apiClient.updateProfile(profileData);
-      
-      if (response.success && response.user) {
-        setUser(response.user);
-        localStorage.setItem('krishiconnect_user', JSON.stringify(response.user));
+      const result = await apiClient.updateProfile(updates);
+      if (result.success && result.user) {
+        setUser(result.user);
         return true;
       }
       return false;
@@ -125,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAuthenticated: !!user,
     isLoading,
     login,
-    voiceLogin,
+    register,
     logout,
     updateProfile,
   };

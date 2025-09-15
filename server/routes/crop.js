@@ -1,11 +1,55 @@
 const express = require('express');
 const CropAdvice = require('../models/CropAdvice');
 const mockDB = require('../utils/mockDatabase');
+const geminiService = require('../config/gemini');
 
 const router = express.Router();
 
-// @route   GET /api/crop/advice
-// @desc    Get crop advice based on crop type and location
+// @route   POST /api/crop/advice
+// @desc    Get AI-powered crop advice using Gemini
+// @access  Public
+router.post('/advice', async (req, res) => {
+  try {
+    const { query, userContext } = req.body;
+
+    if (!query || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Query is required'
+      });
+    }
+
+    // Get AI-powered advice
+    const result = await geminiService.getCropAdvice(query, userContext);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to get crop advice'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        query,
+        response: result.response,
+        cached: result.cached,
+        timestamp: result.timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error('Crop advice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch crop advice'
+    });
+  }
+});
+
+// @route   GET /api/crop/advice (legacy support)
+// @desc    Get crop advice based on crop type and location (legacy)
 // @access  Public
 router.get('/advice', async (req, res) => {
   try {
@@ -18,68 +62,32 @@ router.get('/advice', async (req, res) => {
       });
     }
 
-    let query = { cropName: new RegExp(crop, 'i') };
-    
-    if (season) {
-      query.season = season;
-    }
-    
-    if (state) {
-      query['region.state'] = new RegExp(state, 'i');
-    }
+    // Convert GET request to AI query
+    const query = `I need advice for growing ${crop}${season ? ` in ${season} season` : ''}${state ? ` in ${state}` : ''}`;
+    const userContext = {
+      location: state ? { state } : undefined,
+      language,
+      season
+    };
 
-    const advice = await CropAdvice.findOne(query);
+    const result = await geminiService.getCropAdvice(query, userContext);
 
-    if (!advice) {
-      // Return generic advice if specific not found
-      const genericAdvice = {
-        cropName: crop,
-        season: season || 'general',
-        advice: {
-          planting: {
-            bestTime: "Consult local agricultural experts for optimal planting time",
-            soilPreparation: "Ensure proper soil testing and preparation",
-            seedTreatment: "Use certified seeds and appropriate treatment",
-            spacing: "Follow recommended spacing guidelines"
-          },
-          irrigation: {
-            frequency: "Monitor soil moisture regularly",
-            amount: "Provide adequate water based on crop stage",
-            criticalStages: ["Germination", "Flowering", "Fruit development"]
-          },
-          fertilization: {
-            organic: "Use compost and organic manure",
-            chemical: "Apply balanced NPK fertilizers as per soil test",
-            schedule: ["Pre-planting", "Vegetative stage", "Reproductive stage"]
-          },
-          pestManagement: {
-            commonPests: ["Aphids", "Caterpillars", "Fungal diseases"],
-            preventiveMeasures: ["Crop rotation", "Proper spacing", "Field sanitation"],
-            organicSolutions: ["Neem oil", "Biological control", "Companion planting"]
-          },
-          harvesting: {
-            indicators: "Monitor crop maturity indicators",
-            bestTime: "Harvest at optimal maturity",
-            postHarvest: "Proper drying and storage"
-          }
-        },
-        marketInfo: {
-          averagePrice: 0,
-          demandLevel: "moderate",
-          bestMarkets: ["Local mandis", "Direct sales"]
-        }
-      };
-
-      return res.json({
-        success: true,
-        data: genericAdvice,
-        isGeneric: true
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get crop advice'
       });
     }
 
     res.json({
       success: true,
-      data: advice
+      data: {
+        cropName: crop,
+        season: season || 'general',
+        advice: result.response,
+        cached: result.cached,
+        timestamp: result.timestamp
+      }
     });
 
   } catch (error) {
@@ -91,39 +99,12 @@ router.get('/advice', async (req, res) => {
   }
 });
 
-// @route   GET /api/crop/list
-// @desc    Get list of available crops
-// @access  Public
-router.get('/list', async (req, res) => {
-  try {
-    const { season, state } = req.query;
-    
-    let query = {};
-    if (season) query.season = season;
-    if (state) query['region.state'] = new RegExp(state, 'i');
-
-    const crops = await mockDB.getCropAdvice({ crop: 'cropName', query });
-    
-    res.json({
-      success: true,
-      data: crops.sort()
-    });
-
-  } catch (error) {
-    console.error('Crop list error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch crop list'
-    });
-  }
-});
-
 // @route   POST /api/crop/pest-control
-// @desc    Get pest control advice
+// @desc    Get AI-powered pest control advice
 // @access  Public
 router.post('/pest-control', async (req, res) => {
   try {
-    const { crop, pestType, symptoms, location } = req.body;
+    const { crop, pestType, symptoms, location, userContext } = req.body;
 
     if (!crop || !symptoms) {
       return res.status(400).json({
@@ -132,57 +113,25 @@ router.post('/pest-control', async (req, res) => {
       });
     }
 
-    // Find crop advice that might contain pest information
-    const cropAdvice = await CropAdvice.findOne({
-      cropName: new RegExp(crop, 'i')
-    });
+    const result = await geminiService.getPestAdvice(crop, symptoms, location);
 
-    let pestAdvice = {
-      crop,
-      pestType: pestType || 'Unknown',
-      symptoms,
-      identification: "Based on symptoms, this could be a common pest issue",
-      treatment: {
-        immediate: [
-          "Isolate affected plants if possible",
-          "Remove severely damaged parts",
-          "Apply organic neem oil spray"
-        ],
-        preventive: [
-          "Maintain field hygiene",
-          "Use resistant varieties",
-          "Practice crop rotation",
-          "Monitor regularly"
-        ],
-        organic: [
-          "Neem oil application",
-          "Biological control agents",
-          "Companion planting",
-          "Natural predators"
-        ],
-        chemical: [
-          "Consult agricultural expert for appropriate pesticide",
-          "Follow label instructions carefully",
-          "Use protective equipment",
-          "Observe pre-harvest intervals"
-        ]
-      },
-      prevention: [
-        "Regular field monitoring",
-        "Proper plant spacing",
-        "Balanced nutrition",
-        "Water management"
-      ]
-    };
-
-    if (cropAdvice && cropAdvice.advice.pestManagement) {
-      pestAdvice.treatment.organic = cropAdvice.advice.pestManagement.organicSolutions;
-      pestAdvice.prevention = cropAdvice.advice.pestManagement.preventiveMeasures;
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get pest control advice'
+      });
     }
 
     res.json({
       success: true,
-      data: pestAdvice
+      data: {
+        crop,
+        symptoms,
+        location,
+        advice: result.response,
+        cached: result.cached,
+        timestamp: result.timestamp
+      }
     });
 
   } catch (error) {
@@ -194,8 +143,58 @@ router.post('/pest-control', async (req, res) => {
   }
 });
 
-// @route   GET /api/crop/seasonal
-// @desc    Get seasonal crop recommendations
+// @route   POST /api/crop/seasonal
+// @desc    Get AI-powered seasonal recommendations
+// @access  Public
+router.post('/seasonal', async (req, res) => {
+  try {
+    const { season, location, crops, userContext } = req.body;
+    
+    const currentMonth = new Date().getMonth() + 1;
+    let currentSeason = season;
+    
+    if (!currentSeason) {
+      if (currentMonth >= 6 && currentMonth <= 10) {
+        currentSeason = 'kharif';
+      } else if (currentMonth >= 11 || currentMonth <= 3) {
+        currentSeason = 'rabi';
+      } else {
+        currentSeason = 'zaid';
+      }
+    }
+
+    const result = await geminiService.getSeasonalAdvice(currentSeason, location, crops);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get seasonal advice'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        season: currentSeason,
+        month: currentMonth,
+        location,
+        advice: result.response,
+        cached: result.cached,
+        timestamp: result.timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error('Seasonal advice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch seasonal recommendations'
+    });
+  }
+});
+
+// @route   GET /api/crop/seasonal (legacy support)
+// @desc    Get seasonal crop recommendations (legacy)
 // @access  Public
 router.get('/seasonal', async (req, res) => {
   try {
@@ -211,21 +210,24 @@ router.get('/seasonal', async (req, res) => {
       season = 'zaid';
     }
 
-    let query = { season };
-    if (state) {
-      query['region.state'] = new RegExp(state, 'i');
-    }
+    const location = state ? { state } : undefined;
+    const result = await geminiService.getSeasonalAdvice(season, location);
 
-    const seasonalCrops = await CropAdvice.find(query)
-      .select('cropName season region marketInfo')
-      .limit(20);
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get seasonal advice'
+      });
+    }
 
     res.json({
       success: true,
       data: {
         season,
         month: currentMonth,
-        crops: seasonalCrops
+        advice: result.response,
+        cached: result.cached,
+        timestamp: result.timestamp
       }
     });
 
@@ -234,6 +236,116 @@ router.get('/seasonal', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch seasonal recommendations'
+    });
+  }
+});
+
+// @route   POST /api/crop/fertilizer
+// @desc    Get AI-powered fertilizer recommendations
+// @access  Public
+router.post('/fertilizer', async (req, res) => {
+  try {
+    const { crop, soilType, growthStage, location, userContext } = req.body;
+
+    if (!crop) {
+      return res.status(400).json({
+        success: false,
+        message: 'Crop name is required'
+      });
+    }
+
+    const result = await geminiService.getFertilizerAdvice(
+      crop, 
+      soilType || 'general', 
+      growthStage || 'general', 
+      location
+    );
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get fertilizer advice'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        crop,
+        soilType,
+        growthStage,
+        location,
+        advice: result.response,
+        cached: result.cached,
+        timestamp: result.timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error('Fertilizer advice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get fertilizer advice'
+    });
+  }
+});
+
+// @route   GET /api/crop/list
+// @desc    Get list of available crops from mock database
+// @access  Public
+router.get('/list', async (req, res) => {
+  try {
+    const { season, state } = req.query;
+    
+    const crops = await mockDB.getCropAdvice();
+    const cropNames = crops.map(crop => crop.cropName).filter(Boolean);
+    
+    res.json({
+      success: true,
+      data: [...new Set(cropNames)].sort()
+    });
+
+  } catch (error) {
+    console.error('Crop list error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch crop list'
+    });
+  }
+});
+
+// @route   GET /api/crop/cache-stats
+// @desc    Get cache statistics (for debugging)
+// @access  Public
+router.get('/cache-stats', (req, res) => {
+  try {
+    const stats = geminiService.getCacheStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get cache stats'
+    });
+  }
+});
+
+// @route   POST /api/crop/clear-cache
+// @desc    Clear the advice cache (for maintenance)
+// @access  Public
+router.post('/clear-cache', (req, res) => {
+  try {
+    geminiService.clearCache();
+    res.json({
+      success: true,
+      message: 'Cache cleared successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear cache'
     });
   }
 });

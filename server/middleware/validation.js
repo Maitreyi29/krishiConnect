@@ -55,7 +55,73 @@ const validateRegistration = (req, res, next) => {
   next();
 };
 
+// Weather validation middleware
+const validateWeatherRequest = (req, res, next) => {
+  const { city, state, lat, lon } = req.query;
+  
+  // For coordinate-based requests
+  if (lat && lon) {
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lon);
+    
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid latitude or longitude values'
+      });
+    }
+    
+    if (latitude < -90 || latitude > 90) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude must be between -90 and 90'
+      });
+    }
+    
+    if (longitude < -180 || longitude > 180) {
+      return res.status(400).json({
+        success: false,
+        message: 'Longitude must be between -180 and 180'
+      });
+    }
+  }
+  
+  // For city-based requests
+  if (city) {
+    if (typeof city !== 'string' || city.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'City name must be a non-empty string'
+      });
+    }
+    
+    if (city.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'City name is too long'
+      });
+    }
+    
+    // Basic sanitization
+    req.query.city = city.trim();
+  }
+  
+  if (state) {
+    if (typeof state !== 'string' || state.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'State name must be a non-empty string'
+      });
+    }
+    
+    req.query.state = state.trim();
+  }
+  
+  next();
+};
+
 module.exports = {
   validateLogin,
-  validateRegistration
+  validateRegistration,
+  validateWeatherRequest
 };

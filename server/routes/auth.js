@@ -3,47 +3,137 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { validateLogin, validateRegistration } = require('../middleware/validation');
-const mockDB = require('../utils/mockDatabase');
+const { createClient } = require('@supabase/supabase-js');
 
 const router = express.Router();
 
-// @route   POST /api/auth/login
-// @desc    Login user
+// Initialize Supabase client
+const supabaseUrl = 'https://tegpctsrpuanbtzgitek.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZ3BjdHNycHVhbmJ0emdpdGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4NzA1MDQsImV4cCI6MjA3MzQ0NjUwNH0.WJCRMjH-WibbNwl43_-vTvQRMr493eQhVCuX7aTt8so';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// @route   POST /api/auth/register
+// @desc    Register new user with Supabase
 // @access  Public
-router.post('/login', validateLogin, async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
-    const { name, mobile } = req.body;
+    const { name, mobile, email, password, language, location, farmingDetails } = req.body;
 
-    // Check if user exists in mock database
-    const existingUser = await mockDB.findUserByMobile(mobile.trim());
-    
-    if (!existingUser) {
-      return res.status(401).json({
+    // Basic validation
+    if (!name || !mobile || !email || !password) {
+      return res.status(400).json({
         success: false,
-        message: 'User not found. Please register first.'
+        message: 'Name, mobile, email, and password are required'
       });
     }
 
-    // Verify name matches (simple check for demo)
-    if (existingUser.name.toLowerCase() !== name.trim().toLowerCase()) {
-      return res.status(401).json({
+    // Mobile number validation (Indian format)
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(mobile)) {
+      return res.status(400).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Please enter a valid Indian mobile number'
       });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: existingUser.id, mobile: existingUser.mobile },
-      process.env.JWT_SECRET || 'fallback_secret',
-      { expiresIn: '7d' }
-    );
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
 
+    // Register user with Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name.trim(),
+          mobile: mobile.trim(),
+          language: language || 'english',
+          location: location || {},
+          farmingDetails: farmingDetails || {}
+        }
+      }
+    });
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    // Return success response
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      user: {
+        id: data.user?.id,
+        email: data.user?.email,
+        name: data.user?.user_metadata?.name,
+        mobile: data.user?.user_metadata?.mobile,
+        language: data.user?.user_metadata?.language,
+        location: data.user?.user_metadata?.location,
+        farmingDetails: data.user?.user_metadata?.farmingDetails
+      },
+      session: data.session
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration'
+    });
+  }
+});
+
+// @route   POST /api/auth/login
+// @desc    Login user with Supabase
+// @access  Public
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Basic validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Sign in with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      return res.status(401).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    // Return success response
     res.json({
       success: true,
       message: 'Login successful',
-      token,
-      user: existingUser
+      user: {
+        id: data.user?.id,
+        email: data.user?.email,
+        name: data.user?.user_metadata?.name,
+        mobile: data.user?.user_metadata?.mobile,
+        language: data.user?.user_metadata?.language,
+        location: data.user?.user_metadata?.location,
+        farmingDetails: data.user?.user_metadata?.farmingDetails
+      },
+      session: data.session
     });
 
   } catch (error) {
@@ -51,6 +141,81 @@ router.post('/login', validateLogin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error during login'
+    });
+  }
+});
+
+// @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Public
+router.post('/logout', async (req, res) => {
+  try {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during logout'
+    });
+  }
+});
+
+// @route   GET /api/auth/user
+// @desc    Get current user
+// @access  Private
+router.get('/user', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    
+    // Get user from Supabase using the token
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name,
+        mobile: user.user_metadata?.mobile,
+        language: user.user_metadata?.language,
+        location: user.user_metadata?.location,
+        farmingDetails: user.user_metadata?.farmingDetails
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 });
@@ -209,74 +374,6 @@ router.put('/profile', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error'
-    });
-  }
-});
-
-// @route   POST /api/auth/register
-// @desc    Register new user
-// @access  Public
-router.post('/register', async (req, res) => {
-  try {
-    const { name, mobile, language, location, farmingDetails } = req.body;
-
-    // Basic validation
-    if (!name || !mobile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name and mobile number are required'
-      });
-    }
-
-    // Mobile number validation (Indian format)
-    const mobileRegex = /^[6-9]\d{9}$/;
-    if (!mobileRegex.test(mobile)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please enter a valid Indian mobile number'
-      });
-    }
-
-    // Check if user already exists in mock database
-    const existingUser = await mockDB.findUserByMobile(mobile.trim());
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this mobile number already exists'
-      });
-    }
-
-    // Create user data for mock database
-    const userData = {
-      name: name.trim(),
-      mobile: mobile.trim(),
-      language: language || 'english',
-      location: location || {},
-      farmingDetails: farmingDetails || {}
-    };
-
-    // Save user to mock database
-    const newUser = await mockDB.createUser(userData);
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: newUser.id, mobile: newUser.mobile },
-      process.env.JWT_SECRET || 'fallback_secret',
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      token,
-      user: newUser
-    });
-
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during registration'
     });
   }
 });

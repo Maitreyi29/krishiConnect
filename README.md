@@ -1,31 +1,36 @@
-# KrishiConnect - Smart Farming Assistant
+# KrishiConnect - AI-Powered Digital Farming Assistant
 
-KrishiConnect is an AI-powered farming assistant designed specifically for Indian farmers. It provides multilingual support, weather forecasts, crop advice, market prices, government schemes information, and an intelligent chat assistant (annData) to help farmers make informed decisions.
+KrishiConnect is a comprehensive digital farming platform that empowers farmers with AI-driven crop advice, weather forecasts, market prices, and government scheme information. Built with Next.js and powered by Google's Gemini AI.
 
 ## 🌟 Features
 
-### Frontend Features
-- **Multilingual Support**: 11 languages including Hindi, Tamil, Bengali, Marathi, Gujarati, Punjabi, Kannada, Telugu, Bhojpuri, Odia, and English
-- **Modern UI/UX**: Beautiful glassmorphism design with responsive layout
-- **Voice Login**: Voice authentication support (coming soon)
-- **Dynamic Language Switching**: Real-time UI language updates
-- **Mobile-First Design**: Optimized for all device sizes
+### 🤖 AI-Powered Crop Advice
+- **Gemini AI Integration**: Advanced AI assistant (AnnData) for personalized farming guidance
+- **Contextual Responses**: Location and farming experience-based recommendations
+- **Multi-language Support**: English and Hindi with more languages coming soon
+- **Real-time Chat**: Interactive chat interface with suggestion buttons
+- **Response Caching**: Intelligent caching for improved performance
 
-### Backend Features
-- **User Authentication**: JWT-based secure authentication system
-- **Weather Integration**: Real-time weather data and forecasts
-- **Crop Advice**: Comprehensive crop guidance and recommendations
-- **Pest Control**: Pest identification and treatment suggestions
-- **Market Prices**: Live market prices and trends
-- **Government Schemes**: Information about farming subsidies and schemes
-- **AI Chat Assistant (annData)**: Intelligent farming assistant with multilingual support
+### 🌾 Core Farming Features
+- **Weather Forecasting**: 5-day weather predictions and alerts
+- **Crop Management**: Planting, irrigation, and harvesting guidance
+- **Pest Control**: AI-powered pest identification and treatment recommendations
+- **Market Prices**: Real-time market data and price trends
+- **Government Schemes**: Information about subsidies and farming schemes
+- **Soil Health**: Soil testing and fertilizer recommendations
+
+### 💬 Interactive AI Assistant
+- **Natural Language Processing**: Ask questions in plain English or Hindi
+- **Farming Expertise**: Specialized knowledge of Indian agriculture
+- **Seasonal Advice**: Season-specific crop recommendations
+- **Fertilizer Guidance**: NPK and organic fertilizer suggestions
+- **Chat History**: Previous conversations saved for reference
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- MongoDB (optional - app works without it for demo)
-- npm or yarn
+- Node.js 18+ and npm
+- Google Gemini AI API key
 
 ### Installation
 
@@ -44,166 +49,210 @@ KrishiConnect is an AI-powered farming assistant designed specifically for India
    ```bash
    cd server
    npm install
-   cd ..
    ```
 
-4. **Environment Setup**
-   
-   Create `.env.local` in the root directory:
-   ```env
-   NEXT_PUBLIC_API_URL=http://localhost:5001/api
+4. **Install Gemini AI dependency**
+   ```bash
+   npm install @google/generative-ai
    ```
+
+### Configuration
+
+1. **Set up Gemini AI API Key**
    
-   Create `.env` in the server directory:
+   The Gemini AI API key is already configured in the backend (`server/config/gemini.js`):
+   ```javascript
+   const genAI = new GoogleGenerativeAI('AIzaSyBdm0gktnEtNSwaNVoJmUk8Q7h7nWK3KNU');
+   ```
+
+2. **Environment Variables** (Optional)
+   
+   Create a `.env` file in the server directory for additional configuration:
    ```env
-   NODE_ENV=development
    PORT=5001
-   FRONTEND_URL=http://localhost:3002
-   MONGODB_URI=mongodb://localhost:27017/krishiconnect
-   JWT_SECRET=your_jwt_secret_key_here
-   OPENWEATHER_API_KEY=your_openweather_api_key_here
+   NODE_ENV=development
+   JWT_SECRET=krishiconnect_secret_key
    ```
 
-5. **Start the servers**
-   
-   Start backend server:
+### Running the Application
+
+1. **Start the backend server**
    ```bash
    cd server
-   PORT=5001 node server.js
-   ```
-   
-   Start frontend server (in a new terminal):
-   ```bash
    npm run dev
    ```
+   The server will start on `http://localhost:5001`
 
-6. **Access the application**
-   - Frontend: http://localhost:3002
-   - Backend API: http://localhost:5001/api
+2. **Start the frontend** (in a new terminal)
+   ```bash
+   cd krishiConnect
+   npm run dev
+   ```
+   The frontend will start on `http://localhost:3000`
 
-## 📁 Project Structure
+## 🧪 Testing the AI System
 
+### 1. Registration and Login
+- Register a new user with email, password, and farming details
+- Login with your credentials
+
+### 2. AI Chat Testing
+- Click the floating chat button (🤖) in the bottom-right corner
+- Try these sample queries:
+
+**Crop Advice:**
 ```
-krishiConnect/
-├── app/                    # Next.js app directory
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout with AuthProvider
-│   └── page.tsx           # Main page
-├── components/            # React components
-│   ├── ui/               # Reusable UI components
-│   ├── Dashboard.tsx     # Main dashboard component
-│   └── LoginPage.tsx     # Login page component
-├── lib/                  # Utility libraries
-│   ├── hooks/           # Custom React hooks
-│   └── api.ts           # API client
-├── server/              # Backend server
-│   ├── config/         # Configuration files
-│   ├── middleware/     # Express middleware
-│   ├── models/         # Database models
-│   ├── routes/         # API routes
-│   ├── utils/          # Utility functions
-│   └── server.js       # Main server file
-└── public/             # Static assets
+"How to grow wheat in Punjab during winter?"
+"Best fertilizer for rice in Maharashtra"
+"When should I plant tomatoes?"
 ```
 
-## 🔧 API Endpoints
+**Pest Control:**
+```
+"My wheat crop has yellow leaves and spots"
+"How to control aphids organically?"
+"Pest management for cotton crop"
+```
 
-### Authentication
-- `POST /api/auth/login` - User login
-- `POST /api/auth/voice-login` - Voice login
-- `GET /api/auth/profile` - Get user profile
-- `PUT /api/auth/profile` - Update user profile
+**Seasonal Guidance:**
+```
+"What crops should I grow this season?"
+"Kharif season recommendations for Gujarat"
+"Best time to plant vegetables"
+```
 
-### Weather
-- `GET /api/weather/current` - Current weather
-- `GET /api/weather/forecast` - Weather forecast
+**General Farming:**
+```
+"How to improve soil health?"
+"Government schemes for farmers"
+"Market prices for onions"
+```
 
-### Crop Management
-- `GET /api/crop/advice` - Crop advice
-- `GET /api/crop/list` - Available crops
-- `POST /api/crop/pest-control` - Pest control advice
-- `GET /api/crop/seasonal` - Seasonal crop recommendations
+### 3. API Endpoints Testing
 
-### Market Information
-- `GET /api/market/prices` - Market prices
-- `GET /api/market/trends` - Price trends
-- `GET /api/market/nearby` - Nearby markets
-- `POST /api/market/price-alert` - Set price alerts
-
-### Government Schemes
-- `GET /api/schemes/list` - List schemes
-- `GET /api/schemes/:id` - Scheme details
-- `POST /api/schemes/eligibility-check` - Check eligibility
-- `GET /api/schemes/categories/list` - Scheme categories
-
-### AI Chat (annData)
-- `POST /api/chat/ask` - Ask AI assistant
-- `GET /api/chat/history` - Chat history
-- `POST /api/chat/feedback` - Submit feedback
-
-## 🌍 Supported Languages
-
-1. English
-2. Hindi (हिंदी)
-3. Tamil (தமிழ்)
-4. Bengali (বাংলা)
-5. Marathi (मराठी)
-6. Gujarati (ગુજરાતી)
-7. Punjabi (ਪੰਜਾਬੀ)
-8. Kannada (ಕನ್ನಡ)
-9. Telugu (తెలుగు)
-10. Bhojpuri (भोजपुरी)
-11. Odia (ଓଡ଼ିଆ)
-
-## 🧪 Testing
-
-### Backend API Testing
+**AI Crop Advice:**
 ```bash
-# Health check
-curl -X GET http://localhost:5001/api/health
+curl -X POST http://localhost:5001/api/crop/advice \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How to grow wheat in winter?",
+    "userContext": {
+      "location": {"state": "Punjab", "district": "Ludhiana"},
+      "language": "english",
+      "farmingDetails": {"landSize": 5, "cropTypes": ["wheat", "rice"]}
+    }
+  }'
+```
 
-# Test chat functionality
+**AI Chat:**
+```bash
 curl -X POST http://localhost:5001/api/chat/ask \
   -H "Content-Type: application/json" \
-  -d '{"message": "Hello, I need help with farming", "language": "english"}'
-
-# Test weather (requires API key)
-curl -X GET "http://localhost:5001/api/weather/current?lat=28.6139&lon=77.2090"
+  -d '{
+    "message": "Best crops for this season",
+    "language": "english",
+    "userId": "user123",
+    "userContext": {"location": {"state": "Maharashtra"}}
+  }'
 ```
 
-### Frontend Testing
-1. Open http://localhost:3002
-2. Test language switching
-3. Try login functionality
-4. Navigate through different features
+## 🏗️ Architecture
 
-## 🔐 Security Features
+### Backend Structure
+```
+server/
+├── config/
+│   ├── gemini.js          # Gemini AI service and caching
+│   └── database.js        # Database configuration
+├── routes/
+│   ├── auth.js           # Authentication (Supabase)
+│   ├── crop.js           # AI-powered crop advice
+│   ├── chat.js           # AI chat assistant
+│   ├── market.js         # Market data
+│   └── schemes.js        # Government schemes
+├── models/               # Database models
+├── utils/
+│   └── mockDatabase.js   # Mock data for testing
+└── server.js            # Express server
+```
 
-- JWT-based authentication
-- Rate limiting (100 requests per 15 minutes)
-- Helmet.js security headers
-- CORS configuration
-- Input validation and sanitization
-- Secure password hashing (for mobile numbers)
+### Frontend Structure
+```
+components/
+├── ui/                   # Reusable UI components
+├── ChatInterface.tsx     # AI chat component
+├── Dashboard.tsx         # Main dashboard
+└── LoginPage.tsx         # Authentication
+lib/
+├── api.ts               # API client with AI endpoints
+└── hooks/
+    └── useAuth.tsx      # Authentication hook
+```
 
-## 🚧 Development Notes
+## 🤖 AI Features
 
-### Current Status
-- ✅ Complete backend API structure
-- ✅ Frontend with multilingual support
-- ✅ Authentication system
-- ✅ AI chat functionality
-- ✅ Weather integration ready
-- ✅ Market prices API
-- ✅ Government schemes API
-- ⚠️ MongoDB integration (optional for demo)
-- 🔄 External API integrations (requires API keys)
+### Gemini AI Integration
+- **Model**: Gemini 1.5 Flash for fast, accurate responses
+- **Caching**: 24-hour response caching for performance
+- **Context Awareness**: User location, farming experience, and language
+- **Specialized Prompts**: Tailored for Indian agriculture
 
-### Known Limitations
-- MongoDB connection is disabled for demo purposes
-- External API integrations require valid API keys
-- Voice login is placeholder functionality
-- Some features return sample data when database is not connected
+### Supported Query Types
+1. **Crop Management**: Planting, care, harvesting
+2. **Pest & Disease**: Identification and treatment
+3. **Seasonal Advice**: Season-specific recommendations
+4. **Fertilizer Guidance**: NPK and organic options
+5. **Weather Planning**: Weather-based farming decisions
+6. **Market Intelligence**: Price trends and selling advice
+7. **Government Schemes**: Subsidies and applications
+
+### Cache Management
+- **View Cache Stats**: `GET /api/crop/cache-stats`
+- **Clear Cache**: `POST /api/crop/clear-cache`
+- **Chat Stats**: `GET /api/chat/stats`
+
+## 🌐 Multi-language Support
+
+Currently supported:
+- **English**: Full AI support
+- **Hindi**: Full AI support with Hindi prompts
+
+The AI can understand and respond in both languages, with context-aware responses based on user preference.
+
+## 📱 Mobile Responsive
+
+The application is fully responsive and works seamlessly on:
+- Desktop computers
+- Tablets
+- Mobile phones
+
+## 🔧 Development
+
+### Adding New AI Features
+1. Add new methods to `server/config/gemini.js`
+2. Create corresponding routes in `server/routes/`
+3. Update API client in `lib/api.ts`
+4. Add frontend components as needed
+
+### Customizing AI Responses
+Edit the `createFarmingPrompt` method in `server/config/gemini.js` to modify how the AI responds to different types of queries.
+
+## 🚀 Deployment
+
+### Production Setup
+1. Set up a production database (MongoDB/PostgreSQL)
+2. Configure environment variables
+3. Build the frontend: `npm run build`
+4. Deploy backend and frontend to your preferred hosting platform
+
+### Environment Variables for Production
+```env
+NODE_ENV=production
+PORT=5001
+DATABASE_URL=your_database_url
+JWT_SECRET=your_secure_jwt_secret
+GEMINI_API_KEY=your_gemini_api_key
+```
 
 ## 🤝 Contributing
 
@@ -217,13 +266,13 @@ curl -X GET "http://localhost:5001/api/weather/current?lat=28.6139&lon=77.2090"
 
 This project is licensed under the MIT License.
 
-## 🆘 Support
+## 🙏 Acknowledgments
 
-For support and questions:
-- Create an issue in the repository
-- Contact the development team
-- Check the documentation
+- **Google Gemini AI** for powering the intelligent farming advice
+- **Supabase** for authentication services
+- **Next.js** and **React** for the frontend framework
+- **Express.js** for the backend API
 
 ---
 
-**Built with ❤️ for Indian farmers**
+**Made with ❤️ for farmers** 🌾👨‍🌾

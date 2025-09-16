@@ -7,7 +7,7 @@ annData is an AI-powered farming assistant designed specifically for Indian farm
 ### Frontend Features
 - **Multilingual Support**: 11 languages including Hindi, Tamil, Bengali, Marathi, Gujarati, Punjabi, Kannada, Telugu, Bhojpuri, Odia, and English
 - **Modern UI/UX**: Beautiful glassmorphism design with responsive layout
-- **Voice Login**: Voice authentication support (coming soon)
+- **Voice Login**: Voice authentication support 
 - **Dynamic Language Switching**: Real-time UI language updates
 - **Mobile-First Design**: Optimized for all device sizes
 
